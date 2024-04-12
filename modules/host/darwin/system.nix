@@ -1,6 +1,6 @@
 {
   pkgs,
-  timezone,
+  timezone ? "America/New_York",
   hostname,
   ...
 }:

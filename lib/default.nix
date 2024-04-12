@@ -16,24 +16,45 @@
 
   # Helper to create a nix-darwin configuration
   mkDarwinConfiguration = {
-    pkgs ? inputs.nixpkgs.legacyPackages.${system},
+    pkgs,
     hostname,
-    system,
-    package_info,
+    system ? "aarch64-darwin",
+    package_info ? ({
+          mas_packages = {
+            Xcode = 497799835;
+          };
+          brew_packages = [
+            "curl"
+          ];
+          cask_packages = [
+            "firefox"
+            "google-chrome"
+            "visual-studio-code"
+          ];
+          shared_system_packages = with pkgs; [
+            killall
+            openssh
+            wget
+            tmux
+            vim
+            direnv
+            zsh
+          ];
+          shared_system_packages_darwin = with pkgs; [
+            dockutil
+            mas
+            git
+            neovim
+          ];
+        }),
     modulesDir,
+    timezone ? null,
   }:
     inputs.nix-darwin.lib.darwinSystem {
       specialArgs = {
-        inherit
-          inputs
-          outputs
-          system
-          pkgs
-          hostname
-          package_info
-          modulesDir
-          ;
+        inherit inputs outputs system pkgs hostname package_info timezone modulesDir;
       };
+
       modules = [../hosts];
     };
 

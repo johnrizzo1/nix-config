@@ -59,11 +59,12 @@
 
     # A Dev Shell that matches our base packages
     # nix develop
-    # devShells = libx.forAllSystems (
-    #   system:
-    #     import ./shell.nix {inherit packages;}
-    # );
-    devShells = import ./shell.nix {inherit packages;};
+    devShells = libx.forAllSystems (
+      system:
+        import ./shell.nix {
+          pkgs = nixpkgs.legacyPackages.${system};
+        }
+    );
 
     # Setup a nix code formatter
     formatter = libx.forAllSystems (system: self.packages.${system}.nixfmt);
@@ -79,36 +80,7 @@
         inherit modulesDir;
         system = "aarch64-darwin";
         hostname = "macosdev";
-        # pkgs = inputs.nixpkgs.legacyPackages.aarch64-darwin;
-        # Default Packages by platform, os, user
-        package_info = rec {
-          pkgs = inputs.nixpkgs.legacyPackages.${system};
-          shared_packages = with pkgs; [zip];
-          mas_packages = {Xcode = 497799835;};
-          brew_packages = with pkgs; [
-            wget
-            curl
-          ];
-          cask_packages = [
-            "firefox"
-            "google-chrome"
-            "visual-studio-code"
-          ];
-          shared_system_packages = with pkgs; [
-            killall
-            openssh
-            wget
-            tmux
-            vim
-            direnv
-            zsh
-          ];
-          shared_system_packages_darwin = with pkgs; [
-            dockutil
-            mas
-            neovim
-          ];
-        };
+        pkgs = inputs.nixpkgs.legacyPackages.${system};
       };
 
       # "VCW954LG7G" = libx.mkDarwinConfiguration {

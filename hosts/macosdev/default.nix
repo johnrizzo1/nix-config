@@ -1,6 +1,6 @@
-_: {
-  # imports = [
-  #   # ./users.nix
-  #   ../../modules/host
-  # ];
+{ pkgs, ... }: {
+  # Additional Host specific packages
+  environment.systemPackages = with pkgs; [ 
+    nvd
+  ];
 }
