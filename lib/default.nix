@@ -1,74 +1,78 @@
-{inputs, ...}: {
-  # Helper to create a default shell for each platform with the ability to override.
-  # mkDevShells = { packages ? null, shellHook ? null }:
-  #   libx.forAllSystems(system:
-  #     let
-  #       pkgs = nixpkgs.legacyPackages.${system};
-  #     in {
-  #       default = with pkgs; mkShell {
-  #         nativeBuildInputs = with pkgs; [ bashInteractive git age age-plugin-yubikey ];
-  #         shellHook = with pkgs; ''
-  #           export EDITOR=vim
-  #         '';
-  #       };
-  #     }
-  #   );
+{
+  inputs,
+  outputs,
+  ...
+}: {
+  # Helper to iterate over each of the system types and call a supplied function.
+  # "x86_64-darwin"
+  # "aarch64-linux"
+  # "i686-linux"
+  # "x86_64-linux"
+  forAllSystems = f:
+    inputs.nixpkgs.lib.genAttrs [
+      "aarch64-darwin"
+    ]
+    f;
 
-  # Helper for creating darwin/home-manager systems
-  # mkDarwinConfiguration =
-  #   { hostname, username ? null }:
-  #   inputs.nix-darwin.lib.darwinSystem {
-  #     inherit system; #specialArgs;
-  #     specialArgs = inputs;
+  # Helper to create a nix-darwin configuration
+  mkDarwinConfiguration = {
+    pkgs ? inputs.nixpkgs.legacyPackages.${system},
+    hostname,
+    system,
+    package_info,
+    modulesDir,
+  }:
+    inputs.nix-darwin.lib.darwinSystem {
+      specialArgs = {
+        inherit
+          inputs
+          outputs
+          system
+          pkgs
+          hostname
+          package_info
+          modulesDir
+          ;
+      };
+      modules = [../hosts];
+    };
+
+  # Helper to create a home-manager configuration
+  # mkHomeConfiguration = {
+  #   hostname,
+  #   user,
+  #   desktop ? ( if inputs.nixpkgs.stdenv.isDarwin
+  #               then "macos"
+  #               else null),
+  # }: inputs.home-manager.lib.homeManagerConfiguration {
+  #     extraSpecialArgs = {
+  #       inherit inputs outputs stateVersion hostname user desktop;
+  #     };
   #     modules = [
-  #       # home manager
-  #       home-manager.darwinModules.home-manager
-  #       {
-  #         home-manager.useGlobalPkgs = true;
-  #         home-manager.useUserPackages = true;
-  #         home-manager.extraSpecialArgs = specialArgs;
-  #         home-manager.users.${username} = import ./home;
-  #       }
-
-  #       # homebrew setup
-  #       nix-homebrew.darwinModules.nix-homebrew
-  #           {
-  #             nix-homebrew = {
-  #               inherit user;
-  #               enable = true;
-  #               taps = {
-  #                 "homebrew/homebrew-core" = homebrew-core;
-  #                 "homebrew/homebrew-cask" = homebrew-cask;
-  #                 "homebrew/homebrew-bundle" = homebrew-bundle;
-  #               };
-  #               mutableTaps = false;
-  #               autoMigrate = true;
-  #             };
-  #           }
-  #     ]
-  #   };
-
-  # Helper function for generating host configs
-  # mkNixOSHostConfiguration =
-  #   { hostname, desktop ? null, pkgsInput ? inputs.unstable }:
-  #   pkgsInput.lib.nixosSystem {
-  #     specialArgs = { inherit inputs outputs stateVersion username hostname desktop; };
-  #     modules = [
-  #       inputs.agenix.nixosModules.default
-  #       inputs.lanzaboote.nixosModules.lanzaboote
-  #       inputs.libations.nixosModules.libations
-  #       outputs.nixosModules.scrutiny
-  #       ../host
+  #       ../modules/home
   #     ];
   #   };
 
-  forAllSystems = f:
-    inputs.nixpkgs.lib.genAttrs [
-      "aarch64-linux"
-      "i686-linux"
-      "x86_64-linux"
-      "aarch64-darwin"
-      "x86_64-darwin"
-    ]
-    f;
+  # Helper to setup a nixos host
+  # mkNixOSConfiguration = {
+  #   hostname,
+  #   system,
+  #   desktop ? null,
+  #   isVM ? false,
+  # }:
+  #   inputs.nixpkgs.lib.nixosSystem {
+  #     extraSpecialArgs = {
+  #       inherit inputs outputs hostname desktop isVM;
+  #     };
+
+  #     modules = [
+  #       ../hosts
+  #     ];
+
+  #     # Copy the NixOS configuration file and link it from the resulting system
+  #     # (/run/current-system/configuration.nix). This is useful in case you
+  #     # accidentally delete configuration.nix.
+  #     system.copySystemConfiguration = true;
+  #     system.stateVersion = stateVersion;
+  #   };
 }

@@ -1,0 +1,84 @@
+#! /usr/bin/env nix-shell
+#! nix-shell -i python312 --pure
+#! nix-shell -p python312
+#! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs/commit/057f9aecfb71c4437d2b27d3323df7f93c010b7e
+
+# https://github.com/NixOS/nixpkgs/releases/tag/23.11
+
+# All credit to https://bbgithub.dev.bloomberg.com/raw/mseplowi/wpad-proxy-vars/master/bin/wpad-proxy-vars?token=GHSAT0AAAAAAAADCMNJJBY43C4SOKFVQPQOZQ6ZIRA
+#!/usr/bin/env python3
+
+# Run this like so
+# $ $(wpad-proxies)
+# so that it updates your shell environment
+
+import argparse
+import re
+import textwrap
+import urllib.request
+
+
+def get_proxies(wpad_url):
+    request = urllib.request.Request(wpad_url)
+
+    proxy_handler = urllib.request.ProxyHandler({})  # no proxies
+    url_opener = urllib.request.build_opener(proxy_handler)
+
+    with url_opener.open(request) as response:
+        lines = response.read().decode("ascii").splitlines()
+        proxy_re = re.compile('^[\s]+var (proxy_[\w]+) = "PROXY ([^"]+)";$')
+        matches = (m for m in (proxy_re.match(l) for l in lines) if m)
+        proxies = {m.group(1): m.group(2) for m in matches}
+
+    return proxies
+
+
+if __name__ == "__main__":
+
+    SUMMARY = \
+        "Extracts proxies from WPAD as shell variable assignment statements."
+
+    USAGE_HINT = textwrap.dedent(
+        """\
+        If you want to use these variables in your shell environment,
+        use the source (.) command and process substitution like so:
+
+        . <({prog})
+        """)
+
+    description = SUMMARY + "\n\n" + USAGE_HINT.format(prog="%(prog)s")
+
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=description)
+
+    parser.add_argument(
+        "--export",
+        action="store_true",
+        default=False,
+        help="Add 'export' in front of the variable assignments")
+    parser.add_argument(
+        "--prefix",
+        default="wpad_",
+        help="Prefix to add to variable names (default: %(default)s)")
+    parser.add_argument(
+        "--wpad-url",
+        metavar="URL",
+        help="Override the wpad url (default: %(default)s)",
+        default="http://wpad.bloomberg.com")
+
+    args = parser.parse_args()
+
+    proxies = get_proxies(args.wpad_url)
+
+    for line in USAGE_HINT.format(prog=parser.prog).splitlines():
+        print("#", line)
+
+    print()
+
+    for name, dest in proxies.items():
+        print('{export}{prefix}{name}="{dest}"'.format(
+                export="export " if args.export else "",
+                prefix=args.prefix,
+                name=name,
+                dest=dest))

@@ -3,15 +3,20 @@
 
   # This is the standard format for flake.nix. `inputs` are the dependencies of the flake,
   # Each item in `inputs` will be passed as a parameter to the `outputs` function after being pulled and built.
-  inputs = {
+  inputs = rec {
     nixpkgs-darwin.url = "github:nixos/nixpkgs/nixpkgs-23.11-darwin";
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-23.11-darwin";
     # "github:nixos/nixpkgs/nixos-23.11";
     # "github:nixos/nixpkgs/nixos-unstable";
     # "github:nixos/nixpkgs/nixpkgs-23.11-darwin";
     nixpkgs-unstable.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+
+    # fh.url = "https://flakehub.com/f/DeterminateSystems/fh/*.tar.gz";
+    # fh.inputs.nixpkgs.follows = "nixpkgs";
+
     nix-darwin.url = "github:lnl7/nix-darwin";
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
+
     nix-homebrew.url = "github:zhaofengli-wip/nix-homebrew";
     homebrew-bundle.url = "github:homebrew/homebrew-bundle";
     homebrew-bundle.flake = false;
@@ -37,57 +42,122 @@
   outputs = inputs @ {
     self,
     nixpkgs,
-    nix-darwin,
     ...
   }: let
     inherit (self) outputs;
     stateVersion = "23.11";
-    darwinSystems = ["aarch64-darwin"];
-    linuxSystems = ["aarch64-linux"];
-    forAllSystems = f: nixpkgs.lib.genAttrs (darwinSystems ++ linuxSystems) f;
-    # libx = import ./lib {inherit inputs outputs stateVersion;};
-  in {
-    # System Configurations
-    # nix build .\#darwinConfigurations.macos.system
-    darwinConfigurations."macos" = let
-      timezone = "America/New_York";
-      user = "jrizzo";
-      name = "John Rizzo";
-      email = "johnrizzo1@gmail.com";
-      specialArgs =
-        inputs
-        // {
-          inherit outputs stateVersion user name email timezone;
-        };
-    in
-      nix-darwin.lib.darwinSystem {
-        inherit specialArgs;
-        system = "aarch64-darwin";
-        modules = [./hosts/macos];
-      };
+    modulesDir = ./modules;
+    libx = import ./lib {inherit (self) inputs outputs modulesDir stateVersion;};
+  in rec {
+    # This needs to be defined for classical nix commands to work
+    packages = libx.forAllSystems (
+      system:
+        import ./pkgs {
+          pkgs = nixpkgs.legacyPackages.${system};
+        }
+    );
 
+    # A Dev Shell that matches our base packages
+    # nix develop
+    # devShells = libx.forAllSystems (
+    #   system:
+    #     import ./shell.nix {inherit packages;}
+    # );
+    devShells = import ./shell.nix {inherit packages;};
+
+    # Setup a nix code formatter
+    formatter = libx.forAllSystems (system: self.packages.${system}.nixfmt);
+
+    # Import our custom overlays
     overlays = import ./overlays {inherit inputs;};
 
-    packages = forAllSystems (
-      system: let
-        # pkgs = nixpkgs-unstable.legacyPackages.${system};
-        pkgs = nixpkgs.legacyPackages.${system};
-      in
-        import ./pkgs {inherit pkgs;}
-    );
+    # Systems
+    # the hostname must match `scutil --get LocalHostName`
+    # `nix build .\#darwinConfigurations.macos.system`
+    darwinConfigurations = {
+      "macosdev" = libx.mkDarwinConfiguration rec {
+        inherit modulesDir;
+        system = "aarch64-darwin";
+        hostname = "macosdev";
+        # pkgs = inputs.nixpkgs.legacyPackages.aarch64-darwin;
+        # Default Packages by platform, os, user
+        package_info = rec {
+          pkgs = inputs.nixpkgs.legacyPackages.${system};
+          shared_packages = with pkgs; [zip];
+          mas_packages = {Xcode = 497799835;};
+          brew_packages = with pkgs; [
+            wget
+            curl
+          ];
+          cask_packages = [
+            "firefox"
+            "google-chrome"
+            "visual-studio-code"
+          ];
+          shared_system_packages = with pkgs; [
+            killall
+            openssh
+            wget
+            tmux
+            vim
+            direnv
+            zsh
+          ];
+          shared_system_packages_darwin = with pkgs; [
+            dockutil
+            mas
+            neovim
+          ];
+        };
+      };
 
-    # A Dev Shell
-    devShells = forAllSystems (
-      system: let
-        # pkgs = nixpkgs-unstable.legacyPackages.${system};
-        pkgs = nixpkgs.legacyPackages.${system};
-      in
-        import ./shell.nix {inherit pkgs;}
-    );
+      # "VCW954LG7G" = libx.mkDarwinConfiguration {
+      #   hostname = "VCW954LG7G";
+      #   system = "aarch64-darwin";
+      # };
+    };
 
-    # Setup a nix code formatter based on format-engine = alejandra or nixfmt
-    # formatter = let format-engine = "alejandra"; in
-    #   forAllSystems (system: nixpkgs.legacyPackages.${system}.${format-engine});
-    formatter = forAllSystems (system: self.packages.${system}.nixfmt);
+    # homeConfigurations = {
+    #   "jrizzo@macos" = libx.mkHomeConfiguration {
+    #     hostname = "macos";
+    #     user = {
+    #       user = "jrizzo";
+    #       name = "John Rizzo";
+    #       email = "johnrizzo1@gmail.com";
+    #     };
+    #   };
+
+    #   "jrizzo46@VCW954LG7G" = libx.mkHomeConfiguration {
+    #     hostname = "VCW95$LG7G";
+    #     user = {
+    #       user = "jrizzo46";
+    #       name = "John Rizzo";
+    #       email = "jrizzo46@bloomberg.net";
+    #     };
+    #   };
+    # };
+
+    #
+    # Other evaluation checks
+    #
+    # Derivations
+    # checks.system.name
+    # cdefaultPackage.system
+    #
+    # App definitions
+    # apps.system.name
+    # defaultApp.system
+    #
+    # Template definitions
+    # templates.name
+    # defaultTemplate
+    #
+    # Bundlers
+    # bundlers.name
+    # defaultBundler
+    #
+    # NixOS Modules
+    # nixosModule
+    # nixosModules.name
   };
 }

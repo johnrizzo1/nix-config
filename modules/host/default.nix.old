@@ -1,0 +1,16 @@
+{
+  lib,
+  pkgs,
+  ...
+}: {
+  # imports =
+  #   [
+  #     ./shared/nix.nix
+  #     ./shared/nixpkgs.nix
+  #   ]
+  #   ++ lib.optional (lib.pathExists ./shared/packages.nix) ./shared/packages.nix
+  #   ++ lib.optional pkgs.stdenv.isDarwin ./darwin/system.nix
+  #   ++ lib.optional pkgs.stdenv.isDarwin ./darwin/networking.nix
+  #   ++ lib.optional pkgs.stdenv.isDarwin ./darwin/homebrew.nix
+  #   ++ lib.optional (pkgs.stdenv.isDarwin && lib.pathExists ./darwin/packages.nix) ./darwin/packages.nix;
+}
